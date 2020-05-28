@@ -7,7 +7,6 @@ use Amp\Coroutine;
 use Amp\Deferred;
 use Amp\Loop;
 use Amp\Mysql\ConnectionConfig;
-use Amp\Mysql\ConnectionStatement;
 use Amp\Mysql\DataTypes;
 use Amp\Mysql\InitializationException;
 use Amp\Promise;
@@ -868,7 +867,7 @@ REGEX;
                     $result = new ResultProxy;
                     $result->affectedRows = $this->connInfo->affectedRows;
                     $result->insertId = $this->connInfo->insertId;
-                    $this->getDeferred()->resolve($result);
+                    $this->getDeferred()->resolve(new ConnectionResult($result));
                     $this->result = $result;
                     $result->updateState(ResultProxy::COLUMNS_FETCHED);
                     $this->successfulResultsetFetch();
@@ -891,7 +890,7 @@ REGEX;
         }
 
         $this->parseCallback = [$this, "handleTextColumnDefinition"];
-        $this->getDeferred()->resolve($result = new ResultProxy);
+        $this->getDeferred()->resolve(new ConnectionResult($result = new ResultProxy));
         /* we need to resolve before assigning vars, so that a onResolve() handler won't have a partial result available */
         $this->result = $result;
         $result->setColumns(DataTypes::decodeUnsigned($packet));
@@ -901,7 +900,7 @@ REGEX;
     private function handleExecute(string $packet): void
     {
         $this->parseCallback = [$this, "handleBinaryColumnDefinition"];
-        $this->getDeferred()->resolve($result = new ResultProxy);
+        $this->getDeferred()->resolve(new ConnectionResult($result = new ResultProxy));
         /* we need to resolve before assigning vars, so that a onResolve() handler won't have a partial result available */
         $this->result = $result;
         $result->setColumns(\ord($packet));

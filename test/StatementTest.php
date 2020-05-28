@@ -2,7 +2,7 @@
 
 namespace Amp\Mysql\Test;
 
-use Amp\Mysql\ConnectionStatement;
+use Amp\Mysql\Internal\ConnectionStatement;
 use Amp\Mysql\Internal\ResultProxy;
 use Amp\PHPUnit\AsyncTestCase;
 use Prophecy\Prophecy\ObjectProphecy;
