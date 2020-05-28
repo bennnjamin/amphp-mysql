@@ -5,13 +5,14 @@ namespace Amp\Mysql\Test;
 use Amp\Mysql\ConnectionStatement;
 use Amp\Mysql\Internal\ResultProxy;
 use Amp\PHPUnit\AsyncTestCase;
+use Prophecy\Prophecy\ObjectProphecy;
 
 class StatementTest extends AsyncTestCase
 {
-    /** @var \Prophecy\Prophecy\ObjectProphecy */
+    /** @var ObjectProphecy */
     protected $processor;
 
-    /** @var \Amp\Mysql\Internal\ResultProxy */
+    /** @var ResultProxy */
     protected $resultProxy;
 
     public function setUp(): void
