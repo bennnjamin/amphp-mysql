@@ -17,8 +17,8 @@
         "amphp/amp": "^3",
         "amphp/pipeline": "^1",
         "amphp/socket": "^2",
-        "amphp/sql": "^2",
-        "amphp/sql-common": "^2"
+        "amphp/sql": "dev-closable as 2.0",
+        "amphp/sql-common": "dev-closable as 2.0"
     },
     "require-dev": {
         "ext-mysqli": "*",

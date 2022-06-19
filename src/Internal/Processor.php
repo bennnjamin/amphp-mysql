@@ -65,6 +65,8 @@ REGEX;
 
     private ConnectionState $connectionState = ConnectionState::Unconnected;
 
+    private readonly DeferredFuture $onClose;
+
     private const MAX_PACKET_SIZE = 0xffffff;
     private const MAX_UNCOMPRESSED_BUFLEN = 0xfffffb;
 
@@ -111,14 +113,30 @@ REGEX;
     public function __construct(EncryptableSocket $socket, MysqlConfig $config)
     {
         $this->socket = $socket;
-        $this->metadata = new ConnectionMetadata;
+        $this->metadata = new ConnectionMetadata();
         $this->config = $config;
         $this->lastUsedAt = \time();
+        $this->onClose = new DeferredFuture();
     }
 
-    public function isAlive(): bool
+    public function __destruct()
     {
-        return $this->connectionState <= ConnectionState::Ready;
+        if (!$this->isClosed()) {
+            $this->close();
+        }
+    }
+
+    public function isClosed(): bool
+    {
+        return match ($this->connectionState) {
+            ConnectionState::Closing, ConnectionState::Closed => true,
+            default => false,
+        };
+    }
+
+    public function onClose(\Closure $onClose): void
+    {
+        $this->onClose->getFuture()->finally($onClose);
     }
 
     public function isReady(): bool
@@ -1197,10 +1215,12 @@ REGEX;
 
         $this->connectionState = ConnectionState::Closed;
 
-        if ($this->socket) {
-            $this->socket->close();
-            $this->socket = null;
+        if (!$this->onClose->isComplete()) {
+            $this->onClose->complete();
         }
+
+        $this->socket?->close();
+        $this->socket = null;
 
         $this->processors = [];
     }
