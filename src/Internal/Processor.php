@@ -35,7 +35,7 @@ REGEX;
     private int $seqId = -1;
     private int $compressionId = -1;
 
-    private ?EncryptableSocket $socket;
+    private readonly EncryptableSocket $socket;
 
     private ?string $query = null;
     public array $named = [];
@@ -48,7 +48,7 @@ REGEX;
     /** @var DeferredFuture[] */
     private array $deferreds = [];
 
-    /** @var callable[] */
+    /** @var array<int, \Closure():void> */
     private array $onReady = [];
 
     private ?ResultProxy $result = null;
@@ -64,8 +64,6 @@ REGEX;
     private int $refcount = 1;
 
     private ConnectionState $connectionState = ConnectionState::Unconnected;
-
-    private readonly DeferredFuture $onClose;
 
     private const MAX_PACKET_SIZE = 0xffffff;
     private const MAX_UNCOMPRESSED_BUFLEN = 0xfffffb;
@@ -116,7 +114,6 @@ REGEX;
         $this->metadata = new ConnectionMetadata();
         $this->config = $config;
         $this->lastUsedAt = \time();
-        $this->onClose = new DeferredFuture();
     }
 
     public function __destruct()
@@ -136,7 +133,7 @@ REGEX;
 
     public function onClose(\Closure $onClose): void
     {
-        $this->onClose->getFuture()->finally($onClose);
+        $this->socket->onClose($onClose);
     }
 
     public function isReady(): bool
@@ -165,20 +162,12 @@ REGEX;
         }
 
         $this->resetIds();
-
-        if ($this->socket) {
-            try {
-                $this->socket->unreference();
-            } catch (EventLoop\InvalidCallbackError) {
-                // Undefined destruct order can cause unref of an invalid watcher if the loop is swapped.
-                // Generally this will only happen during tests.
-            }
-        }
+        $this->socket->unreference();
     }
 
     private function addDeferred(DeferredFuture $deferred): void
     {
-        \assert($this->socket !== null, "The connection has been closed");
+        \assert(!$this->socket->isClosed(), "The connection has been closed");
         $this->deferreds[] = $deferred;
         $this->socket->reference();
     }
@@ -217,7 +206,7 @@ REGEX;
     private function read(): void
     {
         try {
-            while ($this->socket !== null && ($bytes = $this->socket->read()) !== null) {
+            while (($bytes = $this->socket->read()) !== null) {
                 // @codeCoverageIgnoreStart
                 \assert((function () use ($bytes) {
                     if (\defined("MYSQL_DEBUG")) {
@@ -277,6 +266,9 @@ REGEX;
         return \array_shift($this->deferreds);
     }
 
+    /**
+     * @param \Closure():void $callback
+     */
     private function appendTask(\Closure $callback): void
     {
         if ($this->packetCallback
@@ -1214,14 +1206,7 @@ REGEX;
         }
 
         $this->connectionState = ConnectionState::Closed;
-
-        if (!$this->onClose->isComplete()) {
-            $this->onClose->complete();
-        }
-
-        $this->socket?->close();
-        $this->socket = null;
-
+        $this->socket->close();
         $this->processors = [];
     }
 
@@ -1250,7 +1235,7 @@ REGEX;
             $packet = $this->compressPacket($packet);
         }
 
-        \assert($this->socket !== null, 'The connection was closed during a call to write');
+        \assert(!$this->socket->isClosed(), 'The connection was closed during a call to write');
         $this->socket->write($packet);
     }
 
@@ -1535,7 +1520,7 @@ REGEX;
                 try {
                     $this->write($payload);
 
-                    $this->socket?->setupTls();
+                    $this->socket->setupTls();
 
                     $this->sendHandshake(true);
                 } catch (\Throwable $e) {
